@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mailrules
+  name: mailrules
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailrules
+  template:
+    metadata:
+      labels:
+        app: mailrules
+    spec:
+      containers:
+      - image: us-south1-docker.pkg.dev/homelab-388417/homelab/mailrules:latest
+        imagePullPolicy: Always
+        name: mailrules
+        env:
+          - name: MAILRULES_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: mailrules-icloud
+                key: username
+          - name: MAILRULES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mailrules-icloud
+                key: password
+        args:
+          - --username=$(MAILRULES_USERNAME)
+          - --password=$(MAILRULES_PASSWORD)
+          - --host=imap.mail.me.com:993
+          - --rules=/etc/mailrules/rules.txt
+        volumeMounts:
+          - name: rules
+            mountPath: /etc/mailrules
+      imagePullSecrets:
+      - name: regcred
+      volumes:
+        - name: rules
+          configMap:
+            name: mailrules-rules
