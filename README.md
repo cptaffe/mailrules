@@ -42,7 +42,6 @@ Possible future features:
 
 - Reload configuration periodically
 - Run at least once every x period
-- Pass configuration via flags
 - Support reading from mailboxes other than Inbox
   - Support rules that operate on these mailboxes (default to Inbox?)
 - Support rules which can use data extracted from the predicate (e.g. regex capture groups can be templated into folder name)
