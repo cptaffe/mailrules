@@ -10,7 +10,7 @@ import (
 %}
 
 %union{
-	Value      string
+    Value      string
     Rules      []rules.Rule
     Rule       rules.Rule
     MoveRule   *rules.MoveRule
