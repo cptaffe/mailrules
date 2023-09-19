@@ -15,6 +15,7 @@ The predicate is formed of:
 - Field equivalence, `to = "someone@example.com"`
 - Field regular expression matches, `to ~ "@example.com$"`
 - Boolean operators `and`, `or` and `not`, `to ~ "@example.com$" and not to = "important@example.com"`
+- Parenthesis for grouping
 
 The action can be one of:
 
