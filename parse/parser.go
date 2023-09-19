@@ -21,6 +21,8 @@ var tokenNumbers = [...]int{
 	TokenThen:       THEN,
 	TokenFlag:       FLAG,
 	TokenUnflag:     UNFLAG,
+	TokenLeftParen:  LPAREN,
+	TokenRightParen: RPAREN,
 }
 
 type Parser struct {

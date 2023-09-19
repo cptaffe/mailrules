@@ -1,4 +1,4 @@
-if  to ~ "^marketing\+"
+if  (to ~ "^marketing\+" or subject = "foo") and not subject = "bar"
     then move "Marketing";
 if to ~ "^logins\+"
     then move "Accounts";

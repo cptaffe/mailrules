@@ -28,7 +28,7 @@ func (p *AndPredicate) MatchMessage(msg *imap.Message) bool {
 }
 
 func (p *AndPredicate) String() string {
-	return fmt.Sprintf("%s and %s", p.Left, p.Right)
+	return fmt.Sprintf("(%s) and (%s)", p.Left, p.Right)
 }
 
 type OrPredicate struct {
@@ -37,7 +37,7 @@ type OrPredicate struct {
 }
 
 func (p *OrPredicate) String() string {
-	return fmt.Sprintf("%s or %s", p.Left, p.Right)
+	return fmt.Sprintf("(%s) or (%s)", p.Left, p.Right)
 }
 
 func (p *OrPredicate) MatchMessage(msg *imap.Message) bool {
@@ -45,7 +45,7 @@ func (p *OrPredicate) MatchMessage(msg *imap.Message) bool {
 }
 
 func (p *NotPredicate) String() string {
-	return fmt.Sprintf("not %s", p.Predicate)
+	return fmt.Sprintf("not (%s)", p.Predicate)
 }
 
 type NotPredicate struct {

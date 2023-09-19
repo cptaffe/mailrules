@@ -10,7 +10,6 @@ import (
 %}
 
 %union{
-    Empty      struct{}
 	Value      string
     Rules      []rules.Rule
     Rule       rules.Rule
@@ -30,7 +29,7 @@ import (
 %type <UnflagRule> unflag
 %type <Predicate> condition comparison
 
-%token <Value> IDENTIFIER QUOTE TILDE EQUALS THEN SEMICOLON IF MOVE FLAG UNFLAG
+%token <Value> IDENTIFIER QUOTE TILDE EQUALS THEN SEMICOLON IF MOVE FLAG UNFLAG LPAREN RPAREN
 
 %%
 start: rules
@@ -65,6 +64,8 @@ condition: comparison
     { $$ = &rules.OrPredicate{Left: $1, Right: $3} }
     | NOT condition
     { $$ = &rules.NotPredicate{Predicate: $2} }
+    | LPAREN condition RPAREN
+    { $$ = $2 }
 
 comparison:
     IDENTIFIER TILDE QUOTE
