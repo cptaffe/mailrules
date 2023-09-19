@@ -52,7 +52,31 @@ Use an app-specific password.
 
 ## Running
 
+To run locally, first install `goyacc`:
+
+```sh
+; go install modernc.org/goyacc@latest
 ```
+
+Then generate the parser:
+
+```sh
+go generate ./parse
+```
+
+Then compile and run `mailrules`:
+
+```sh
+go run . \
+  --host=imap.mail.me.com:993 \
+  --username=$(op read op://Personal/mailrules-icloud/username) \
+  --password=$(op read op://Personal/mailrules-icloud/password) \
+  --rules=rules.txt
+```
+
+To run within a docker image:
+
+```sh
 ; docker build .
 ; docker run \
   -v $(pwd)/rules.txt:/etc/mailrules/rules.txt \
