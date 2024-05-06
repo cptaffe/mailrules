@@ -1,6 +1,6 @@
-if  to ~ "^marketing\+"
+if  to ~ "^marketing[\+\.]"
     then move "Marketing";
-if to ~ "^logins\+"
+if to ~ "^logins[\+\.]"
     then move "Accounts";
-if to ~ "^little-rock\+"
+if to ~ "^little-rock[\+\.]"
     then move "Little Rock";
