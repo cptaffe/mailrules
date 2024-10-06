@@ -4,3 +4,5 @@ if to ~ "^logins[\+\.]"
     then move "Accounts";
 if to ~ "^little-rock[\+\.]"
     then move "Little Rock";
+if to ~ "^legal[\+\.]"
+    then move "Legal";
