@@ -105,15 +105,12 @@ func main() {
 }
 
 func processMailbox(c *client.Client, mbox *imap.MailboxStatus, rules []rules.Rule) {
-	from := uint32(1)
-	to := mbox.Messages
 	seqset := new(imap.SeqSet)
-	seqset.AddRange(from, to)
-
+	seqset.AddRange(1, 0)
 	messages := make(chan *imap.Message, 10)
 	done := make(chan error, 1)
 	go func() {
-		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
+		done <- c.UidFetch(seqset, []imap.FetchItem{imap.FetchUid, imap.FetchEnvelope}, messages)
 	}()
 
 	log.Println("Reading Inbox...")

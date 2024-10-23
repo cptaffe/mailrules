@@ -58,7 +58,7 @@ const (
 	TokenEquals
 	TokenTilde
 
-	// Reserverd words
+	// Reserved words
 	TokenIf
 	TokenMove
 	TokenAnd
@@ -67,6 +67,7 @@ const (
 	TokenThen
 	TokenFlag
 	TokenUnflag
+	TokenStream
 )
 
 var tokenNames = [...]string{
@@ -109,6 +110,7 @@ var tokenNames = [...]string{
 	TokenThen:         "THEN",
 	TokenFlag:         "FLAG",
 	TokenUnflag:       "UNFLAG",
+	TokenStream:       "STREAM",
 }
 
 var reservedWords = map[string]TokenType{
@@ -120,6 +122,7 @@ var reservedWords = map[string]TokenType{
 	"then":   TokenThen,
 	"flag":   TokenFlag,
 	"unflag": TokenUnflag,
+	"stream": TokenStream,
 }
 
 func (tok Token) String() string {
@@ -285,6 +288,14 @@ func (lex *Lexer) scanQuote() Token {
 	startpos := lex.rpos
 	lex.next()
 	for lex.r > 0 && lex.r != '"' {
+		if lex.r == '\\' {
+			lex.next()
+			switch lex.r {
+			case '\\', '"':
+			default:
+				return makeErrorToken(lex.rpos)
+			}
+		}
 		lex.next()
 	}
 

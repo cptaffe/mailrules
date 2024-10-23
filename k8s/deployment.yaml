@@ -15,9 +15,9 @@ spec:
         app: mailrules
     spec:
       containers:
-      - image: us-south1-docker.pkg.dev/homelab-388417/homelab/mailrules:latest
+      - name: mailrules
+        image: us-south1-docker.pkg.dev/homelab-388417/homelab/mailrules:latest
         imagePullPolicy: Always
-        name: mailrules
         env:
           - name: MAILRULES_USERNAME
             valueFrom:
@@ -37,9 +37,27 @@ spec:
         volumeMounts:
           - name: rules
             mountPath: /etc/mailrules
+          - name: journalclub
+            mountPath: /usr/src/mailrules/journalclub
+      # Syncs journalclub rss snippets to GCS
+      - name: gcs-syncer
+        image: gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine
+        command: ["/bin/sh"]
+        args: ["-c", "gcloud auth activate-service-account --key-file=/var/gcp-creds/creds.json; while true; do gsutil -q -m rsync -r -u /var/journalclub/ gs://connor.zip/journalclub/; gsutil -q -m rsync -r -u gs://connor.zip/journalclub/ /var/journalclub/; sleep 300; done"]
+        volumeMounts:
+          - name: gcp-creds
+            readOnly: true
+            mountPath: /var/gcp-creds
+          - name: journalclub
+            mountPath: /var/journalclub
       imagePullSecrets:
       - name: regcred
       volumes:
         - name: rules
           configMap:
             name: mailrules-rules
+        - name: gcp-creds
+          secret:
+            secretName: gcp-creds
+        - name: journalclub
+          emptyDir: {}

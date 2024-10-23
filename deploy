@@ -4,7 +4,7 @@ set -euxo pipefail
 tag=$(git rev-parse --short HEAD)
 image="us-south1-docker.pkg.dev/homelab-388417/homelab/mailrules"
 
-docker build --progress=plain . --tag "$image:$tag"
+docker buildx build --platform linux/amd64 --progress=plain . --tag "$image:$tag"
 docker tag "$image:$tag" "$image:latest"
 docker push --quiet "$image:$tag"
 docker push --quiet "$image:latest"

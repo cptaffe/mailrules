@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Copy message into temporary file
+message=`mktemp`
+cat >"$message"
+
+# Exit early if the file exists
+target="journalclub/item-$message_date_rfc3339.xml"
+if [ -f "$target" ]
+then exit
+fi
+
+# Extract fields from message
+audio_url=`sed -nr 's/.*"(https?:\/\/[^ ]+\.mp3)".*/\1/p' <"$message" | head -n1`
+image_url=`sed -nr 's/.*<img src="(https?:\/\/[^ ]*)".*/\1/p' <"$message" | head -n1`
+description=`sed -nr 's/.*(Hi[ ]+Connor,[^<]*)<\/p>.*/\1/p' <"$message"` # TODO: capitalize
+audio_size=`curl -sSI https://s3.amazonaws.com/journalclub.io/mqtt-full.mp3 | sed -nr 's/Content-Length: (.*)\r/\1/p'`
+
+# Construct RSS <item>
+cat >"$target" <<-EOF
+    <item>
+        <title>$message_subject</title>
+        <description>$description</description>
+        <guid isPermaLink="false">$message_uuid</guid>
+        <pubDate>$message_date_rfc2822</pubDate>
+        <enclosure
+            url="$audio_url"
+            length="$audio_size"
+            type="audio/mpeg"
+            />
+        <itunes:image href="$image_url" />
+        <itunes:explicit>false</itunes:explicit>
+    </item>
+EOF
+
+# Update the feed with all items
+cat >"journalclub/feed.xml" <<-EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+  xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Journal Club</title>
+    <link>https://journalclub.io/</link>
+    <language>en-us</language>
+    <copyright>&#169; 2024 JournalClub.io</copyright>
+    <itunes:author>Journal Club</itunes:author>
+    <description>
+      Journal Club is a premium daily newsletter and podcast authored and hosted by Malcolm Diggs.
+      Each episode is lovingly crafted by hand, and delivered to your inbox every morning in text and audio form.
+    </description>
+    <itunes:type>serial</itunes:type>
+    <itunes:image href="https://www.journalclub.io/cdn-cgi/image/width=1000/images/journals/journal-splash.png"/>
+    <itunes:category text="Science" />
+    <itunes:explicit>false</itunes:explicit>
+    `cat journalclub/item-*.xml`
+  </channel>
+</rss>
+EOF

@@ -21,6 +21,7 @@ var tokenNumbers = [...]int{
 	TokenThen:       THEN,
 	TokenFlag:       FLAG,
 	TokenUnflag:     UNFLAG,
+	TokenStream:     STREAM,
 	TokenLeftParen:  LPAREN,
 	TokenRightParen: RPAREN,
 }
@@ -43,6 +44,8 @@ func (p *Parser) Lex(lval *yySymType) int {
 		case TokenError:
 			p.err = fmt.Errorf("lexing error: %s", tok.Value)
 			return -1
+		case TokenComment:
+			continue // skip
 		default:
 			lval.Value = tok.Value
 			return tokenNumbers[tok.Type]

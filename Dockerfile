@@ -14,4 +14,7 @@ COPY rules ./rules
 COPY main.go .
 RUN go build -v -o /usr/local/bin/mailrules .
 
+RUN mkdir journalclub
+COPY filters filters
+
 ENTRYPOINT ["/usr/local/bin/mailrules"]

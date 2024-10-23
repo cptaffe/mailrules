@@ -4,6 +4,7 @@ package parse
 import (
     "fmt"
     "regexp"
+    "strings"
 
     "github.com/cptaffe/mailrules/rules"
 )
@@ -11,11 +12,13 @@ import (
 
 %union{
     Value      string
+    Values     []string
     Rules      []rules.Rule
     Rule       rules.Rule
     MoveRule   *rules.MoveRule
     FlagRule   *rules.FlagRule
     UnflagRule *rules.UnflagRule
+    StreamRule *rules.StreamRule
     Predicate  rules.Predicate
 }
 
@@ -27,9 +30,12 @@ import (
 %type <MoveRule> move
 %type <FlagRule> flag
 %type <UnflagRule> unflag
+%type <StreamRule> stream
 %type <Predicate> condition comparison
+%type <Values> list
+%type <Value> string
 
-%token <Value> IDENTIFIER QUOTE TILDE EQUALS THEN SEMICOLON IF MOVE FLAG UNFLAG LPAREN RPAREN
+%token <Value> IDENTIFIER QUOTE TILDE EQUALS THEN SEMICOLON IF MOVE FLAG UNFLAG STREAM LPAREN RPAREN
 
 %%
 start: rules
@@ -55,6 +61,11 @@ rule: IF condition THEN move
         $4.Predicate = $2
         $$ = $4
     }
+    | IF condition THEN stream
+    {
+        $4.Predicate = $2
+        $$ = $4
+    }
 
 condition: comparison
     { $$ = $1 }
@@ -68,11 +79,11 @@ condition: comparison
     { $$ = $2 }
 
 comparison:
-    IDENTIFIER TILDE QUOTE
+    IDENTIFIER TILDE string
     {
-        rexp, err := regexp.Compile($3[1:len($3)-1])
+        rexp, err := regexp.Compile($3)
         if err != nil {
-            yylex.Error(fmt.Sprintf("malformed regex '%s' in predicate: %v", $3[1:len($3)-1], err))
+            yylex.Error(fmt.Sprintf("malformed regex '%s' in predicate: %v", $3, err))
             return -1
         }
         $$, err = rules.NewFieldPredicate($1, rexp)
@@ -81,9 +92,9 @@ comparison:
             return -1
         }
     }
-    | IDENTIFIER EQUALS QUOTE
+    | IDENTIFIER EQUALS string
     {
-        predicate, err := rules.NewFieldPredicate($1, rules.StringEqualsPredicate($3[1:len($3)-1]))
+        predicate, err := rules.NewFieldPredicate($1, rules.StringEqualsPredicate($3))
         if err != nil {
             yylex.Error(err.Error())
             return -1
@@ -91,15 +102,30 @@ comparison:
         $$ = predicate
     }
 
-move: MOVE QUOTE
-    { $$ = rules.NewMoveRule(nil, $2[1:len($2)-1]) }
+move: MOVE string
+    { $$ = rules.NewMoveRule(nil, $2) }
 
 flag: FLAG
     { $$ = rules.NewFlagRule(nil, "") }
-    | FLAG QUOTE
-    { $$ = rules.NewFlagRule(nil, $2[1:len($2)-1]) }
+    | FLAG string
+    { $$ = rules.NewFlagRule(nil, $2) }
 
 unflag: UNFLAG
     { $$ = rules.NewUnflagRule(nil, "") }
-    | UNFLAG QUOTE
-    { $$ = rules.NewUnflagRule(nil, $2[1:len($2)-1]) }
+    | UNFLAG string
+    { $$ = rules.NewUnflagRule(nil, $2) }
+
+stream: STREAM string
+    { $$ = rules.NewStreamRule(nil, $2) }
+
+list: string
+    { $$ = append($$, $1) }
+    | IDENTIFIER
+    { $$ = append($$, $1) }
+    | list string
+    { $$ = append($1, $2) }
+    | list IDENTIFIER
+    { $$ = append($1, $2) }
+
+string: QUOTE
+    { $$ = strings.ReplaceAll(strings.ReplaceAll($1[1:len($1)-1], "\\\"", "\""), "\\\\", "\\") }
