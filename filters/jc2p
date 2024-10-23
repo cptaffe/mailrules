@@ -49,10 +49,7 @@ cat >"journalclub/feed.xml" <<-EOF
     <language>en-us</language>
     <copyright>&#169; 2024 JournalClub.io</copyright>
     <itunes:author>Journal Club</itunes:author>
-    <description>
-      Journal Club is a premium daily newsletter and podcast authored and hosted by Malcolm Diggs.
-      Each episode is lovingly crafted by hand, and delivered to your inbox every morning in text and audio form.
-    </description>
+    <description> Journal Club is a premium daily newsletter and podcast authored and hosted by Malcolm Diggs. Each episode is lovingly crafted by hand, and delivered to your inbox every morning in text and audio form.</description>
     <itunes:image href="https://www.journalclub.io/cdn-cgi/image/width=1000/images/journals/journal-splash.png"/>
     <itunes:category text="Science" />
     <itunes:explicit>false</itunes:explicit>
