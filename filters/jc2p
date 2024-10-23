@@ -54,7 +54,7 @@ cat >"journalclub/feed.xml" <<-EOF
     <itunes:image href="https://www.journalclub.io/cdn-cgi/image/width=1000/images/journals/journal-splash.png"/>
     <itunes:category text="Science" />
     <itunes:explicit>false</itunes:explicit>
-    `cat journalclub/item-*.xml`
+    `cat $(ls -r journalclub/item-*.xml)`
   </channel>
 </rss>
 EOF
