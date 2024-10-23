@@ -53,7 +53,6 @@ cat >"journalclub/feed.xml" <<-EOF
       Journal Club is a premium daily newsletter and podcast authored and hosted by Malcolm Diggs.
       Each episode is lovingly crafted by hand, and delivered to your inbox every morning in text and audio form.
     </description>
-    <itunes:type>serial</itunes:type>
     <itunes:image href="https://www.journalclub.io/cdn-cgi/image/width=1000/images/journals/journal-splash.png"/>
     <itunes:category text="Science" />
     <itunes:explicit>false</itunes:explicit>
