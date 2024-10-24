@@ -314,11 +314,17 @@ func (r *StreamRule) Action(client *client.Client) error {
 		if err != nil {
 			errs = append(errs, fmt.Errorf("parse date of message %d: %w", message.Uid, err))
 		}
+		dec := new(mime.WordDecoder)
+		subject, err := dec.DecodeHeader(msg.Header.Get("Subject"))
+		if err != nil {
+			errs = append(errs, fmt.Errorf("decode subject of message %d: %w", message.Uid, err))
+			subject = msg.Header.Get("Subject") // Use un-decoded subject
+		}
 		cmd.Env = append(
 			os.Environ(),
 			[]string{
 				"message_uuid=" + msg.Header.Get("X-Apple-UUID"),
-				"message_subject=" + msg.Header.Get("Subject"),
+				"message_subject=" + subject,
 				"message_date_rfc3339=" + date.Format(time.RFC3339),
 				"message_date_rfc2822=" + date.Format(RFC2822),
 			}...,
