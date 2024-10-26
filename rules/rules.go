@@ -261,13 +261,22 @@ func (r *UnflagRule) String() string {
 
 type StreamRule struct {
 	Predicate Predicate
+	Content   StreamContent
 	Command   string
 	messages  *imap.SeqSet
 }
 
-func NewStreamRule(predicate Predicate, command string) *StreamRule {
+type StreamContent string
+
+const (
+	StreamContentHTML   StreamContent = "html"
+	StreamContentRFC822 StreamContent = "rfc822"
+)
+
+func NewStreamRule(predicate Predicate, content string, command string) *StreamRule {
 	return &StreamRule{
 		Predicate: predicate,
+		Content:   StreamContent(content),
 		Command:   command,
 		messages:  new(imap.SeqSet),
 	}
@@ -299,42 +308,76 @@ func (r *StreamRule) Action(client *client.Client) error {
 
 	var errs []error
 	for message := range messages {
-		msg, err := messageParse(message)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("parse message %d: %w", message.Uid, err))
+		// Construct an RFC822 representation of the email
+		var header io.Reader
+		var body io.Reader
+		for k, v := range message.Body {
+			if v == nil {
+				continue
+			}
+			switch k.Specifier {
+			case "HEADER":
+				header = v
+			case "TEXT":
+				body = v
+			}
+		}
+		if header == nil || body == nil {
+			errs = append(errs, fmt.Errorf("message %d missing header, body, or both", message.Uid))
 			continue
 		}
-		html, err := messageMIME(msg, "text/html")
-		if err != nil {
-			errs = append(errs, fmt.Errorf("html of message %d: %w", message.Uid, err))
-			continue
-		}
-		cmd := exec.Command("bash", "-c", r.Command)
-		date, err := msg.Header.Date()
-		if err != nil {
-			errs = append(errs, fmt.Errorf("parse date of message %d: %w", message.Uid, err))
-		}
-		dec := new(mime.WordDecoder)
-		subject, err := dec.DecodeHeader(msg.Header.Get("Subject"))
-		if err != nil {
-			errs = append(errs, fmt.Errorf("decode subject of message %d: %w", message.Uid, err))
-			subject = msg.Header.Get("Subject") // Use un-decoded subject
-		}
-		cmd.Env = append(
-			os.Environ(),
-			[]string{
-				"message_uuid=" + msg.Header.Get("X-Apple-UUID"),
-				"message_subject=" + subject,
-				"message_date_rfc3339=" + date.Format(time.RFC3339),
-				"message_date_rfc2822=" + date.Format(RFC2822),
-			}...,
-		)
-		cmd.Stdin = html
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			errs = append(errs, fmt.Errorf("stream messages to `%s`: %w", r.Command, err))
-			continue
+		rfc822 := io.MultiReader(header, body)
+
+		switch r.Content {
+		case StreamContentRFC822:
+			// Pass the email to the command verbatim
+			cmd := exec.Command("bash", "-c", r.Command)
+			cmd.Stdin = rfc822
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: %w", r.Command, err))
+				continue
+			}
+		case StreamContentHTML:
+			// Parse the email and find the HTML to pass to the command
+			msg, err := mail.ReadMessage(rfc822)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("parse message: %w", err))
+				continue
+			}
+			html, err := messageMIME(msg, "text/html")
+			if err != nil {
+				errs = append(errs, fmt.Errorf("html of message %d: %w", message.Uid, err))
+				continue
+			}
+			cmd := exec.Command("bash", "-c", r.Command)
+			date, err := msg.Header.Date()
+			if err != nil {
+				errs = append(errs, fmt.Errorf("parse date of message %d: %w", message.Uid, err))
+			}
+			dec := new(mime.WordDecoder)
+			subject, err := dec.DecodeHeader(msg.Header.Get("Subject"))
+			if err != nil {
+				errs = append(errs, fmt.Errorf("decode subject of message %d: %w", message.Uid, err))
+				subject = msg.Header.Get("Subject") // Use un-decoded subject
+			}
+			cmd.Env = append(
+				os.Environ(),
+				[]string{
+					"message_uuid=" + msg.Header.Get("X-Apple-UUID"),
+					"message_subject=" + subject,
+					"message_date_rfc3339=" + date.Format(time.RFC3339),
+					"message_date_rfc2822=" + date.Format(RFC2822),
+				}...,
+			)
+			cmd.Stdin = html
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: %w", r.Command, err))
+				continue
+			}
 		}
 	}
 	if len(errs) != 0 {
@@ -349,31 +392,7 @@ func (r *StreamRule) Action(client *client.Client) error {
 }
 
 func (r *StreamRule) String() string {
-	return fmt.Sprintf("if %s then stream \"%s\"", r.Predicate, r.Command)
-}
-
-func messageParse(message *imap.Message) (*mail.Message, error) {
-	var header io.Reader
-	var body io.Reader
-	for k, v := range message.Body {
-		if v == nil {
-			continue
-		}
-		switch k.Specifier {
-		case "HEADER":
-			header = v
-		case "TEXT":
-			body = v
-		}
-	}
-	if header == nil || body == nil {
-		return nil, fmt.Errorf("message %d missing header, body, or both", message.Uid)
-	}
-	msg, err := mail.ReadMessage(io.MultiReader(header, body))
-	if err != nil {
-		return nil, fmt.Errorf("parse message: %w", err)
-	}
-	return msg, nil
+	return fmt.Sprintf("if %s then stream %s \"%s\"", r.Predicate, r.Content, r.Command)
 }
 
 // Find and parse part of message

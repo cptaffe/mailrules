@@ -115,8 +115,8 @@ unflag: UNFLAG
     | UNFLAG string
     { $$ = rules.NewUnflagRule(nil, $2) }
 
-stream: STREAM string
-    { $$ = rules.NewStreamRule(nil, $2) }
+stream: STREAM IDENTIFIER string
+    { $$ = rules.NewStreamRule(nil, $2, $3) }
 
 list: string
     { $$ = append($$, $1) }

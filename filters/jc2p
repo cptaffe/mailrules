@@ -15,7 +15,7 @@ fi
 audio_url=`sed -nr 's/.*"(https?:\/\/[^ ]+\.mp3)".*/\1/p' <"$message" | head -n1`
 image_url=`sed -nr 's/.*<img src="(https?:\/\/[^ ]*)".*/\1/p' <"$message" | head -n1`
 description=`sed -nr 's/.*(Hi[ ]+Connor,[^<]*)<\/p>.*/\1/p' <"$message"` # TODO: capitalize
-audio_size=`curl -sSI https://s3.amazonaws.com/journalclub.io/mqtt-full.mp3 | sed -nr 's/Content-Length: (.*)\r/\1/p'`
+audio_size=`curl -sSI "$audio_url" | sed -nr 's/Content-Length: (.*)\r/\1/p'`
 
 # Construct RSS <item>
 cat >"$target" <<-EOF

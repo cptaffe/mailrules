@@ -7,4 +7,4 @@ if to ~ "^little-rock[\\+\\.]"
 if to ~ "^legal[\\+\\.]"
     then move "Legal";
 if from ~ "^members@journalclub.io$"
-    then stream "./filters/jc2p";
+    then stream html "./filters/jc2p";

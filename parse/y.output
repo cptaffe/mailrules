@@ -22,13 +22,13 @@ state 2 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON [$end]
     $end  reduce using rule 1 (start)
     IF    shift, and goto state 4
 
-    rule  goto state 36
+    rule  goto state 37
 
 state 3 // IF IDENTIFIER EQUALS QUOTE THEN FLAG [SEMICOLON]
 
     2 rules: rule . SEMICOLON
 
-    SEMICOLON  shift, and goto state 35
+    SEMICOLON  shift, and goto state 36
 
 state 4 // IF
 
@@ -249,7 +249,7 @@ state 25 // IF IDENTIFIER EQUALS QUOTE THEN UNFLAG [SEMICOLON]
 
     SEMICOLON  reduce using rule 6 (rule)
 
-state 26 // IF IDENTIFIER EQUALS QUOTE THEN STREAM QUOTE [SEMICOLON]
+state 26 // IF IDENTIFIER EQUALS QUOTE THEN STREAM IDENTIFIER QUOTE [SEMICOLON]
 
     7 rule: IF condition THEN stream .  [SEMICOLON]
 
@@ -261,7 +261,7 @@ state 27 // IF IDENTIFIER EQUALS QUOTE THEN MOVE
 
     QUOTE  shift, and goto state 13
 
-    string  goto state 34
+    string  goto state 35
 
 state 28 // IF IDENTIFIER EQUALS QUOTE THEN FLAG
 
@@ -271,7 +271,7 @@ state 28 // IF IDENTIFIER EQUALS QUOTE THEN FLAG
     QUOTE      shift, and goto state 13
     SEMICOLON  reduce using rule 16 (flag)
 
-    string  goto state 33
+    string  goto state 34
 
 state 29 // IF IDENTIFIER EQUALS QUOTE THEN UNFLAG
 
@@ -281,54 +281,60 @@ state 29 // IF IDENTIFIER EQUALS QUOTE THEN UNFLAG
     QUOTE      shift, and goto state 13
     SEMICOLON  reduce using rule 18 (unflag)
 
-    string  goto state 32
+    string  goto state 33
 
 state 30 // IF IDENTIFIER EQUALS QUOTE THEN STREAM
 
-   20 stream: STREAM . string
+   20 stream: STREAM . IDENTIFIER string
+
+    IDENTIFIER  shift, and goto state 31
+
+state 31 // IF IDENTIFIER EQUALS QUOTE THEN STREAM IDENTIFIER
+
+   20 stream: STREAM IDENTIFIER . string
 
     QUOTE  shift, and goto state 13
 
-    string  goto state 31
+    string  goto state 32
 
-state 31 // IF IDENTIFIER EQUALS QUOTE THEN STREAM QUOTE [SEMICOLON]
+state 32 // IF IDENTIFIER EQUALS QUOTE THEN STREAM IDENTIFIER QUOTE [SEMICOLON]
 
-   20 stream: STREAM string .  [SEMICOLON]
+   20 stream: STREAM IDENTIFIER string .  [SEMICOLON]
 
     SEMICOLON  reduce using rule 20 (stream)
 
-state 32 // IF IDENTIFIER EQUALS QUOTE THEN UNFLAG QUOTE [SEMICOLON]
+state 33 // IF IDENTIFIER EQUALS QUOTE THEN UNFLAG QUOTE [SEMICOLON]
 
    19 unflag: UNFLAG string .  [SEMICOLON]
 
     SEMICOLON  reduce using rule 19 (unflag)
 
-state 33 // IF IDENTIFIER EQUALS QUOTE THEN FLAG QUOTE [SEMICOLON]
+state 34 // IF IDENTIFIER EQUALS QUOTE THEN FLAG QUOTE [SEMICOLON]
 
    17 flag: FLAG string .  [SEMICOLON]
 
     SEMICOLON  reduce using rule 17 (flag)
 
-state 34 // IF IDENTIFIER EQUALS QUOTE THEN MOVE QUOTE [SEMICOLON]
+state 35 // IF IDENTIFIER EQUALS QUOTE THEN MOVE QUOTE [SEMICOLON]
 
    15 move: MOVE string .  [SEMICOLON]
 
     SEMICOLON  reduce using rule 15 (move)
 
-state 35 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON
+state 36 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON
 
     2 rules: rule SEMICOLON .  [$end, IF]
 
     $end  reduce using rule 2 (rules)
     IF    reduce using rule 2 (rules)
 
-state 36 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON IF IDENTIFIER EQUALS QUOTE THEN FLAG [SEMICOLON]
+state 37 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON IF IDENTIFIER EQUALS QUOTE THEN FLAG [SEMICOLON]
 
     3 rules: rules rule . SEMICOLON
 
-    SEMICOLON  shift, and goto state 37
+    SEMICOLON  shift, and goto state 38
 
-state 37 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON
+state 38 // IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON IF IDENTIFIER EQUALS QUOTE THEN FLAG SEMICOLON
 
     3 rules: rules rule SEMICOLON .  [$end, IF]
 
