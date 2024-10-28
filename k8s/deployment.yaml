@@ -39,41 +39,6 @@ spec:
             mountPath: /etc/mailrules
           - name: journalclub
             mountPath: /usr/src/mailrules/journalclub
-      # Syncs journalclub rss snippets to GCS
-      - name: gcs-syncer
-        image: gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine
-        command: ["/bin/sh"]
-        args:
-          - -c
-          - |
-            gcloud auth activate-service-account --key-file=/var/gcp-creds/creds.json
-            while true
-            do
-              gsutil -q -m rsync -r -u /var/journalclub/ gs://connor.zip/journalclub/
-              sleep 300
-            done
-        volumeMounts:
-          - name: gcp-creds
-            readOnly: true
-            mountPath: /var/gcp-creds
-          - name: journalclub
-            mountPath: /var/journalclub
-      initContainers:
-      # Seed the journalclub folder with existing rss items
-      - name: gcs-seed
-        image: gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine
-        command: ["/bin/sh"]
-        args:
-          - -c
-          - |
-            gcloud auth activate-service-account --key-file=/var/gcp-creds/creds.json
-            gsutil -q -m rsync -r -u gs://connor.zip/journalclub/ /var/journalclub/
-        volumeMounts:
-          - name: gcp-creds
-            readOnly: true
-            mountPath: /var/gcp-creds
-          - name: journalclub
-            mountPath: /var/journalclub
       imagePullSecrets:
       - name: regcred
       volumes:

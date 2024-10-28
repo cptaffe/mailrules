@@ -1,5 +1,9 @@
 FROM golang:1.21 AS build
 
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/mailrules
 
 RUN go install modernc.org/goyacc@latest
@@ -13,8 +17,5 @@ RUN go generate ./parse
 COPY rules ./rules
 COPY main.go .
 RUN go build -v -o /usr/local/bin/mailrules .
-
-RUN mkdir journalclub
-COPY filters filters
 
 ENTRYPOINT ["/usr/local/bin/mailrules"]

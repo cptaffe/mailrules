@@ -7,4 +7,4 @@ if to ~ "^little-rock[\\+\\.]"
 if to ~ "^legal[\\+\\.]"
     then move "Legal";
 if from ~ "^members@journalclub.io$"
-    then stream html "./filters/jc2p";
+    then stream rfc822 "curl --silent --show-error --fail-with-body http://email2rss/journalclub/email --data @-";
