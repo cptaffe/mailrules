@@ -303,30 +303,18 @@ func (r *StreamRule) Action(client *client.Client) error {
 	messages := make(chan *imap.Message, 10)
 	done := make(chan error, 1)
 	go func() {
-		done <- client.UidFetch(msgs, []imap.FetchItem{imap.FetchUid, imap.FetchRFC822Header, imap.FetchRFC822Text}, messages)
+		done <- client.UidFetch(msgs, []imap.FetchItem{imap.FetchUid, "BODY[]"}, messages)
 	}()
 
 	var errs []error
 	for message := range messages {
-		// Construct an RFC822 representation of the email
-		var header io.Reader
-		var body io.Reader
-		for k, v := range message.Body {
+		var rfc822 io.Reader
+		for _, v := range message.Body {
 			if v == nil {
 				continue
 			}
-			switch k.Specifier {
-			case "HEADER":
-				header = v
-			case "TEXT":
-				body = v
-			}
+			rfc822 = v
 		}
-		if header == nil || body == nil {
-			errs = append(errs, fmt.Errorf("message %d missing header, body, or both", message.Uid))
-			continue
-		}
-		rfc822 := io.MultiReader(header, body)
 
 		switch r.Content {
 		case StreamContentRFC822:

@@ -6,5 +6,7 @@ if to ~ "^little-rock[\\+\\.]"
     then move "Little Rock";
 if to ~ "^legal[\\+\\.]"
     then move "Legal";
-if from ~ "^members@journalclub.io$"
-    then stream rfc822 "curl --silent --show-error --fail-with-body --header \"Content-Type: message/rfc822\" --header \"Accept: application/json\" --data-binary @- http://email2rss/journalclub/email";
+if from = "members@journalclub.io"
+    then stream rfc822 "curl --silent --show-error --fail-with-body --header \"Content-Type: message/rfc822\" --header \"Accept: application/json\" --data-binary @- http://email2rss/email2rss/journalclub/email";
+if from = "crew@littlerockdaily.com"
+    then stream rfc822 "curl --silent --show-error --fail-with-body --header \"Content-Type: message/rfc822\" --header \"Accept: application/json\" --data-binary @- http://email2rss/email2rss/littlerockdaily/email";
