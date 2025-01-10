@@ -9,9 +9,8 @@ import (
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
+	"net/http"
 	"net/mail"
-	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -262,8 +261,9 @@ func (r *UnflagRule) String() string {
 type StreamRule struct {
 	Predicate Predicate
 	Content   StreamContent
-	Command   string
+	URL       string
 	messages  *imap.SeqSet
+	client    *http.Client
 }
 
 type StreamContent string
@@ -273,18 +273,19 @@ const (
 	StreamContentRFC822 StreamContent = "rfc822"
 )
 
-func NewStreamRule(predicate Predicate, content string, command string) *StreamRule {
+func NewStreamRule(predicate Predicate, content string, url string) *StreamRule {
 	return &StreamRule{
 		Predicate: predicate,
 		Content:   StreamContent(content),
-		Command:   command,
+		URL:       url,
 		messages:  new(imap.SeqSet),
+		client:    http.DefaultClient,
 	}
 }
 
 func (r StreamRule) Message(msg *imap.Message) {
 	if r.Predicate.MatchMessage(msg) {
-		log.Printf("Streaming '%s' to '%s'", msg.Envelope.Subject, r.Command)
+		log.Printf("Streaming '%s' to '%s'", msg.Envelope.Subject, r.URL)
 		r.messages.AddNum(msg.Uid)
 	}
 }
@@ -319,14 +320,22 @@ func (r *StreamRule) Action(client *client.Client) error {
 		switch r.Content {
 		case StreamContentRFC822:
 			// Pass the email to the command verbatim
-			cmd := exec.Command("bash", "-c", r.Command)
-			cmd.Stdin = rfc822
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: %w", r.Command, err))
+			req, err := http.NewRequest(http.MethodPost, r.URL, rfc822)
+			req.Header.Set("Content-Type", "message/rfc822")
+			req.Header.Set("Accept", "application/json")
+			if err != nil {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: construct post request: %w", r.URL, err))
 				continue
 			}
+			resp, err := r.client.Do(req)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: do http request: %w", r.URL, err))
+				continue
+			}
+			if resp.StatusCode < 200 && resp.StatusCode >= 300 {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: error response: %d", r.URL, resp.StatusCode))
+			}
+			resp.Body.Close()
 		case StreamContentHTML:
 			// Parse the email and find the HTML to pass to the command
 			msg, err := mail.ReadMessage(rfc822)
@@ -339,7 +348,6 @@ func (r *StreamRule) Action(client *client.Client) error {
 				errs = append(errs, fmt.Errorf("html of message %d: %w", message.Uid, err))
 				continue
 			}
-			cmd := exec.Command("bash", "-c", r.Command)
 			date, err := msg.Header.Date()
 			if err != nil {
 				errs = append(errs, fmt.Errorf("parse date of message %d: %w", message.Uid, err))
@@ -350,22 +358,26 @@ func (r *StreamRule) Action(client *client.Client) error {
 				errs = append(errs, fmt.Errorf("decode subject of message %d: %w", message.Uid, err))
 				subject = msg.Header.Get("Subject") // Use un-decoded subject
 			}
-			cmd.Env = append(
-				os.Environ(),
-				[]string{
-					"message_uuid=" + msg.Header.Get("X-Apple-UUID"),
-					"message_subject=" + subject,
-					"message_date_rfc3339=" + date.Format(time.RFC3339),
-					"message_date_rfc2822=" + date.Format(RFC2822),
-				}...,
-			)
-			cmd.Stdin = html
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: %w", r.Command, err))
+			req, err := http.NewRequest(http.MethodPost, r.URL, html)
+			req.Header.Set("Content-Type", "message/rfc822")
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("X-Message-UUID", msg.Header.Get("X-Apple-UUID"))
+			req.Header.Set("X-Message-Subject", subject)
+			req.Header.Set("X-Message-Date-RFC3339", date.Format(time.RFC3339))
+			req.Header.Set("X-Message-Date-RFC2822", date.Format(RFC2822))
+			if err != nil {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: construct post request: %w", r.URL, err))
 				continue
 			}
+			resp, err := r.client.Do(req)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: do http request: %w", r.URL, err))
+				continue
+			}
+			if resp.StatusCode < 200 && resp.StatusCode >= 300 {
+				errs = append(errs, fmt.Errorf("stream messages to `%s`: error response: %d", r.URL, resp.StatusCode))
+			}
+			resp.Body.Close()
 		}
 	}
 	if len(errs) != 0 {
@@ -373,14 +385,14 @@ func (r *StreamRule) Action(client *client.Client) error {
 	}
 
 	if err := <-done; err != nil {
-		return fmt.Errorf("stream messages to `%s`: %w", r.Command, err)
+		return fmt.Errorf("stream messages to `%s`: %w", r.URL, err)
 	}
 
 	return nil
 }
 
 func (r *StreamRule) String() string {
-	return fmt.Sprintf("if %s then stream %s \"%s\"", r.Predicate, r.Content, r.Command)
+	return fmt.Sprintf("if %s then stream %s \"%s\"", r.Predicate, r.Content, r.URL)
 }
 
 // Find and parse part of message
