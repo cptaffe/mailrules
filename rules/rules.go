@@ -1,8 +1,8 @@
 package rules
 
 import (
+	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -21,7 +21,7 @@ import (
 
 type Rule interface {
 	Message(*imap.Message)
-	Action(client *client.Client) error
+	Action(ctx context.Context, client *client.Client) error
 }
 
 type Predicate interface {
@@ -144,7 +144,7 @@ func (r MoveRule) Message(msg *imap.Message) {
 	}
 }
 
-func (r *MoveRule) Action(client *client.Client) error {
+func (r *MoveRule) Action(ctx context.Context, client *client.Client) error {
 	msgs := r.messages
 	r.messages = new(imap.SeqSet)
 	if msgs.Empty() {
@@ -191,7 +191,7 @@ func (r FlagRule) Message(msg *imap.Message) {
 	}
 }
 
-func (r *FlagRule) Action(client *client.Client) error {
+func (r *FlagRule) Action(ctx context.Context, client *client.Client) error {
 	msgs := r.messages
 	r.messages = new(imap.SeqSet)
 	if msgs.Empty() {
@@ -239,7 +239,7 @@ func (r UnflagRule) Message(msg *imap.Message) {
 	}
 }
 
-func (r *UnflagRule) Action(client *client.Client) error {
+func (r *UnflagRule) Action(ctx context.Context, client *client.Client) error {
 	msgs := r.messages
 	r.messages = new(imap.SeqSet)
 	if msgs.Empty() {
@@ -294,7 +294,7 @@ const (
 	RFC2822 string = "Mon, 02 Jan 2006 15:04:05 MST"
 )
 
-func (r *StreamRule) Action(client *client.Client) error {
+func (r *StreamRule) Action(ctx context.Context, client *client.Client) error {
 	msgs := r.messages
 	r.messages = new(imap.SeqSet)
 	if msgs.Empty() {
@@ -307,87 +307,86 @@ func (r *StreamRule) Action(client *client.Client) error {
 		done <- client.UidFetch(msgs, []imap.FetchItem{imap.FetchUid, "BODY[]"}, messages)
 	}()
 
-	var errs []error
 	for message := range messages {
-		var rfc822 io.Reader
-		for _, v := range message.Body {
-			if v == nil {
-				continue
-			}
-			rfc822 = v
+		err := r.handleMessage(ctx, message)
+		if err != nil {
+			log.Printf("stream message `%s` to `%s`: %v", message.Envelope.Subject, r.URL, err)
 		}
-
-		switch r.Content {
-		case StreamContentRFC822:
-			// Pass the email to the command verbatim
-			req, err := http.NewRequest(http.MethodPost, r.URL, rfc822)
-			req.Header.Set("Content-Type", "message/rfc822")
-			req.Header.Set("Accept", "application/json")
-			if err != nil {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: construct post request: %w", r.URL, err))
-				continue
-			}
-			resp, err := r.client.Do(req)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: do http request: %w", r.URL, err))
-				continue
-			}
-			if resp.StatusCode < 200 && resp.StatusCode >= 300 {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: error response: %d", r.URL, resp.StatusCode))
-			}
-			resp.Body.Close()
-		case StreamContentHTML:
-			// Parse the email and find the HTML to pass to the command
-			msg, err := mail.ReadMessage(rfc822)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("parse message: %w", err))
-				continue
-			}
-			html, err := messageMIME(msg, "text/html")
-			if err != nil {
-				errs = append(errs, fmt.Errorf("html of message %d: %w", message.Uid, err))
-				continue
-			}
-			date, err := msg.Header.Date()
-			if err != nil {
-				errs = append(errs, fmt.Errorf("parse date of message %d: %w", message.Uid, err))
-			}
-			dec := new(mime.WordDecoder)
-			subject, err := dec.DecodeHeader(msg.Header.Get("Subject"))
-			if err != nil {
-				errs = append(errs, fmt.Errorf("decode subject of message %d: %w", message.Uid, err))
-				subject = msg.Header.Get("Subject") // Use un-decoded subject
-			}
-			req, err := http.NewRequest(http.MethodPost, r.URL, html)
-			req.Header.Set("Content-Type", "message/rfc822")
-			req.Header.Set("Accept", "application/json")
-			req.Header.Set("X-Message-UUID", msg.Header.Get("X-Apple-UUID"))
-			req.Header.Set("X-Message-Subject", subject)
-			req.Header.Set("X-Message-Date-RFC3339", date.Format(time.RFC3339))
-			req.Header.Set("X-Message-Date-RFC2822", date.Format(RFC2822))
-			if err != nil {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: construct post request: %w", r.URL, err))
-				continue
-			}
-			resp, err := r.client.Do(req)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: do http request: %w", r.URL, err))
-				continue
-			}
-			if resp.StatusCode < 200 && resp.StatusCode >= 300 {
-				errs = append(errs, fmt.Errorf("stream messages to `%s`: error response: %d", r.URL, resp.StatusCode))
-			}
-			resp.Body.Close()
-		}
-	}
-	if len(errs) != 0 {
-		return errors.Join(errs...)
 	}
 
 	if err := <-done; err != nil {
 		return fmt.Errorf("stream messages to `%s`: %w", r.URL, err)
 	}
 
+	return nil
+}
+
+func (r *StreamRule) handleMessage(ctx context.Context, message *imap.Message) error {
+	var rfc822 io.Reader
+	for _, v := range message.Body {
+		if v == nil {
+			continue
+		}
+		rfc822 = v
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	switch r.Content {
+	case StreamContentRFC822:
+		// Pass the email to the command verbatim
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL, rfc822)
+		req.Header.Set("Content-Type", "message/rfc822")
+		req.Header.Set("Accept", "application/json")
+		if err != nil {
+			return fmt.Errorf("stream messages to `%s`: construct post request: %w", r.URL, err)
+		}
+		resp, err := r.client.Do(req)
+		if err != nil {
+			return fmt.Errorf("stream messages to `%s`: do http request: %w", r.URL, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 && resp.StatusCode >= 300 {
+			return fmt.Errorf("stream messages to `%s`: error response: %d", r.URL, resp.StatusCode)
+		}
+	case StreamContentHTML:
+		// Parse the email and find the HTML to pass to the command
+		msg, err := mail.ReadMessage(rfc822)
+		if err != nil {
+			return fmt.Errorf("parse message: %w", err)
+		}
+		html, err := messageMIME(msg, "text/html")
+		if err != nil {
+			return fmt.Errorf("html of message %d: %w", message.Uid, err)
+		}
+		date, err := msg.Header.Date()
+		if err != nil {
+			return fmt.Errorf("parse date of message %d: %w", message.Uid, err)
+		}
+		dec := new(mime.WordDecoder)
+		subject, err := dec.DecodeHeader(msg.Header.Get("Subject"))
+		if err != nil {
+			return fmt.Errorf("decode subject of message %d: %w", message.Uid, err)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL, html)
+		req.Header.Set("Content-Type", "message/rfc822")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-Message-UUID", msg.Header.Get("X-Apple-UUID"))
+		req.Header.Set("X-Message-Subject", subject)
+		req.Header.Set("X-Message-Date-RFC3339", date.Format(time.RFC3339))
+		req.Header.Set("X-Message-Date-RFC2822", date.Format(RFC2822))
+		if err != nil {
+			return fmt.Errorf("stream messages to `%s`: construct post request: %w", r.URL, err)
+		}
+		resp, err := r.client.Do(req)
+		if err != nil {
+			return fmt.Errorf("stream messages to `%s`: do http request: %w", r.URL, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 && resp.StatusCode >= 300 {
+			return fmt.Errorf("stream messages to `%s`: error response: %d", r.URL, resp.StatusCode)
+		}
+	}
 	return nil
 }
 

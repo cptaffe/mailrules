@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/cptaffe/mailrules/parse"
 	"github.com/cptaffe/mailrules/rules"
@@ -61,8 +64,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	for {
-		processMailbox(c, mbox, rules)
+		processMailbox(ctx, c, mbox, rules)
 
 		log.Println("Listening...")
 
@@ -98,13 +103,15 @@ func main() {
 					log.Fatal(err)
 				}
 				goto Process
+			case <-ctx.Done():
+				return
 			}
 		}
 	Process:
 	}
 }
 
-func processMailbox(c *client.Client, mbox *imap.MailboxStatus, rules []rules.Rule) {
+func processMailbox(ctx context.Context, c *client.Client, mbox *imap.MailboxStatus, rules []rules.Rule) {
 	seqset := new(imap.SeqSet)
 	seqset.AddRange(1, 0)
 	messages := make(chan *imap.Message, 10)
@@ -122,7 +129,7 @@ func processMailbox(c *client.Client, mbox *imap.MailboxStatus, rules []rules.Ru
 
 	// TODO: Multiple rules can match the same message and perform incompatible actions
 	for _, rule := range rules {
-		err := rule.Action(c)
+		err := rule.Action(ctx, c)
 		if err != nil {
 			log.Println("Apply rule:", err)
 		}
