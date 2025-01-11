@@ -263,6 +263,7 @@ type StreamRule struct {
 	Content   StreamContent
 	URL       string
 	messages  *imap.SeqSet
+	done      *imap.SeqSet
 	client    *http.Client
 }
 
@@ -279,11 +280,15 @@ func NewStreamRule(predicate Predicate, content string, url string) *StreamRule 
 		Content:   StreamContent(content),
 		URL:       url,
 		messages:  new(imap.SeqSet),
+		done:      new(imap.SeqSet), // this rule has processed this message previously
 		client:    http.DefaultClient,
 	}
 }
 
 func (r StreamRule) Message(msg *imap.Message) {
+	if r.done.Contains(msg.Uid) {
+		return
+	}
 	if r.Predicate.MatchMessage(msg) {
 		log.Printf("Streaming '%s' to '%s'", msg.Envelope.Subject, r.URL)
 		r.messages.AddNum(msg.Uid)
@@ -297,6 +302,7 @@ const (
 func (r *StreamRule) Action(ctx context.Context, client *client.Client) error {
 	msgs := r.messages
 	r.messages = new(imap.SeqSet)
+	r.done.AddSet(msgs)
 	if msgs.Empty() {
 		return nil
 	}
